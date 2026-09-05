@@ -10,6 +10,9 @@ This is the same "agent loop" pattern used by every agent framework,
 just written out explicitly so you can see and modify every step.
 """
 
+import os
+import time
+
 import ollama
 from duckduckgo_search import DDGS
 
@@ -20,7 +23,25 @@ from duckduckgo_search import DDGS
 #   ollama pull llama3.1
 #   ollama pull qwen2.5
 #   ollama pull mistral-nemo
-MODEL = "llama3.1"
+MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
+
+# When running in Docker, this points at the "ollama" service defined in
+# docker-compose.yml instead of localhost. Locally it defaults to Ollama's
+# normal address.
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+client = ollama.Client(host=OLLAMA_HOST)
+
+
+def wait_for_ollama(timeout: int = 60):
+    """Block until the Ollama server is reachable (useful when both start via compose)."""
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            client.list()
+            return
+        except Exception:
+            time.sleep(1)
+    raise RuntimeError(f"Could not reach Ollama at {OLLAMA_HOST} after {timeout}s")
 
 SYSTEM_PROMPT = (
     "You are a helpful local assistant. "
@@ -86,7 +107,7 @@ AVAILABLE_FUNCTIONS = {
 # ---------------------------------------------------------------------------
 def run_agent_turn(messages: list) -> str:
     """Send messages to the model, resolve any tool calls, return final text answer."""
-    response = ollama.chat(model=MODEL, messages=messages, tools=TOOLS)
+    response = client.chat(model=MODEL, messages=messages, tools=TOOLS)
     msg = response["message"]
     messages.append(msg)
 
@@ -102,7 +123,7 @@ def run_agent_turn(messages: list) -> str:
 
             messages.append({"role": "tool", "content": result})
 
-        response = ollama.chat(model=MODEL, messages=messages, tools=TOOLS)
+        response = client.chat(model=MODEL, messages=messages, tools=TOOLS)
         msg = response["message"]
         messages.append(msg)
 
@@ -110,8 +131,9 @@ def run_agent_turn(messages: list) -> str:
 
 
 def main():
+    wait_for_ollama()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    print(f"Local agent ready (model: {MODEL}). Type 'exit' to quit.\n")
+    print(f"Local agent ready (model: {MODEL} @ {OLLAMA_HOST}). Type 'exit' to quit.\n")
 
     while True:
         user_input = input("You: ").strip()
