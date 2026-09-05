@@ -48,6 +48,43 @@ before answering, which means it decided on its own to search.
   or calls another tool. This request → tool → request cycle is the entire
   "agent loop."
 
+## Running with Docker (recommended for portability)
+
+This runs Ollama and the agent as two containers, wired together with
+`docker-compose`. Models are stored in a persistent volume so you don't
+re-download them on every rebuild.
+
+```bash
+# 1. Start Ollama in the background
+docker compose up -d ollama
+
+# 2. Pull a tool-capable model into the running Ollama container
+docker exec -it ollama ollama pull llama3.1
+
+# 3. Build and run the agent interactively
+docker compose run --rm agent
+```
+
+`docker compose run --rm agent` (rather than `up`) is used because the
+agent is an interactive terminal chat — this attaches your terminal to it
+properly and removes the container when you exit.
+
+To stop everything:
+
+```bash
+docker compose down
+```
+
+Your pulled models persist in the `ollama_data` volume even after `down`,
+so you won't need to re-pull them next time.
+
+**Notes:**
+- To use a different model, change `OLLAMA_MODEL` in `docker-compose.yml`
+  and `docker exec -it ollama ollama pull <model>`.
+- GPU acceleration: uncomment the `deploy.resources` block in
+  `docker-compose.yml` (requires the NVIDIA Container Toolkit on the host).
+  Without a GPU, Ollama runs on CPU — fine for small models, slow for large ones.
+
 ## Where to go from here
 
 - **Add more tools**: e.g. a calculator, file reader, or a Google Custom
