@@ -61,13 +61,15 @@ docker compose up -d ollama
 # 2. Pull a tool-capable model into the running Ollama container
 docker exec -it ollama ollama pull llama3.1
 
-# 3. Build and run the agent interactively
-docker compose run --rm agent
+# 3. Build and start the web UI
+docker compose up -d agent
 ```
 
-`docker compose run --rm agent` (rather than `up`) is used because the
-agent is an interactive terminal chat — this attaches your terminal to it
-properly and removes the container when you exit.
+Then open **http://localhost:5000** in your browser and chat.
+
+The small dot in the top-left of the page shows live connection status to
+Ollama (green = connected, red = unreachable). Hit "reset" to clear the
+conversation history.
 
 To stop everything:
 
@@ -84,6 +86,20 @@ so you won't need to re-pull them next time.
 - GPU acceleration: uncomment the `deploy.resources` block in
   `docker-compose.yml` (requires the NVIDIA Container Toolkit on the host).
   Without a GPU, Ollama runs on CPU — fine for small models, slow for large ones.
+
+## Web UI vs terminal
+
+`app.py` is a small Flask server that reuses the exact same tool-calling
+loop from `agent.py` (`run_agent_turn`, `TOOLS`, `web_search`) — nothing
+about the agent logic changes, it's just fronted by a browser instead of
+a terminal `input()` loop. `/api/chat` takes a message, runs it through
+the loop, and returns the final answer as JSON.
+
+To run the terminal version instead inside Docker:
+
+```bash
+docker compose run --rm agent python -u agent.py
+```
 
 ## Where to go from here
 
